@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include weekly_report *.css
+recursive-include weekly_report *.csv
+recursive-include weekly_report *.html
+recursive-include weekly_report *.ico
+recursive-include weekly_report *.js
+recursive-include weekly_report *.json
+recursive-include weekly_report *.md
+recursive-include weekly_report *.png
+recursive-include weekly_report *.py
+recursive-include weekly_report *.svg
+recursive-include weekly_report *.txt
+recursive-exclude weekly_report *.pyc

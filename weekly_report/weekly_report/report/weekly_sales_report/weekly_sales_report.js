@@ -40,13 +40,26 @@ frappe.query_reports["Weekly Sales Report"] = {
 		{
 			fieldname: "cost_center",
 			label: __("Cost Center"),
-			fieldtype: "Link",
+			fieldtype: "MultiSelectList",
 			options: "Cost Center",
 			reqd:0,				
 			get_data: function(txt) {				
 				return frappe.db.get_link_options("Cost Center", txt);
 			}
-		}
+		},
+		{
+			fieldname:"fiscal_endDt",
+			label: __("Fiscal EndDate"),
+			fieldtype: "Date",
+			default: frappe.defaults.get_user_default("year_end_date"),
+			hidden: 1,				
+		},
+		{
+			fieldname: "fiscalyr",
+			label: __("Year"),
+			fieldtype: "Int",
+			hidden: 1
+		},
 
 	],
 	onload: function (report) {
@@ -65,9 +78,10 @@ frappe.query_reports["Weekly Sales Report"] = {
 				callback: function (r) {
 					$(".report-wrapper").html("");
 					$(".justify-center").remove()
-                    //console.log(r)
+                    //console.log(r.message[3])
 					if (r.message[2] != "") {
-						var fiscal_endDt = new Date(frappe.defaults.get_user_default("year_end_date"))
+						//var fiscal_endDt = new Date(frappe.defaults.get_user_default("year_end_date"))
+						var fiscal_endDt = new Date(r.message[3])
 						var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 						var FDay = fiscal_endDt.getDate() + 1;
 						var FYear = fiscal_endDt.getFullYear();
@@ -102,7 +116,20 @@ function dynamic_exportcontent(cnt_list, EDate, cost_center) {
 
 		dynhtml += '<table id=' + $crntid + '>';
 		var compnyName = "";
-		compnyName = gbl_ind == 0 ? "Consolidated" : cnt_list[2];
+		var trmcc = lstCstCntr[gbl_ind];
+		/*var spltcostcntr = (trmcc).split('-');
+        
+			if (spltcostcntr.length > 1) {
+				spltcostcntr.shift();
+				spltcostcntr.pop()
+
+			}
+        */
+		var spltcostcntr = (trmcc).slice(5);
+		var spltcostcntr1 = spltcostcntr.substr(0, (spltcostcntr.length)-5)
+        	
+
+		compnyName = gbl_ind == 0 ? "Consolidated" : spltcostcntr1; //cnt_list[2];
 
 		dynhtml += '<caption><span style="font-weight: bold;">Company Name- ' + compnyName + '</br>Weekly Backlog Report</br>For the Year ending ' + EDate + '</span><caption>';
 		for (var cnt = 0; cnt < collist.length; cnt++) {
@@ -175,7 +202,7 @@ function totalAmt_permthweeks(cnt_list, colDt) {
 
 			if (fetchmnth == colDt[col].label) {
 				if (fetchweek.toLowerCase() != "") {
-					gblweekprice += val;
+					gblweekprice = val;
 					iscol_exist = true;
 				}
 			}

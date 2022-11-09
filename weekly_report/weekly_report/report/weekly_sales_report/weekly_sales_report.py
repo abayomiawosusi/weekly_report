@@ -368,7 +368,7 @@ def get_weekly_report_record(report_name,filters):
                 mth_end_day = calendar.monthrange(currdt.year,currdt.month)[1]
                 mth_end_date = datetime.date(currdt.year, currdt.month, mth_end_day)
                 #print(mth_end_date)
-                sales_recssubset2 = getsalesbacklogforyr(mth_end_date)
+                sales_recssubset2 = getsalesbacklogforyr(mth_end_date,filters)
                 i += 1
                 currdt2 = currdt + relativedelta(months=+1)
                 currdt = currdt2
@@ -425,7 +425,7 @@ def get_weekly_report_record(report_name,filters):
                 mth_end_day = calendar.monthrange(currdt.year,currdt.month)[1]
                 mth_end_date = datetime.date(currdt.year, currdt.month, mth_end_day)
                 #print(mth_end_date)
-                sales_recssubset2 = getsalesbacklogforyr(mth_end_date)
+                sales_recssubset2 = getsalesbacklogforyr(mth_end_date,filters)
                 i += 1
                 currdt2 = currdt + relativedelta(months=+1)
                 currdt = currdt2
@@ -506,7 +506,7 @@ def get_weekly_report_record(report_name,filters):
             ##for dd in min_date_backlog:
             for dd in min_date_backloglst:
                 if ((dd[3]==consolidatedcc) and (dd[0]==mthyrstr) and (dd[1]==fyr)):
-                    ccTotalAmt0 = dd[2]
+                    ccTotalAmt0 += dd[2]
             year_total_list2.setdefault(consolidatedcc, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(mthyrstr,ccTotalAmt0)
             year_total_list2[consolidatedcc][fyr][mthyrstr] += flt(ccTotalAmt0)    
                 #if ((dd.cost_center==consolidatedcc) and (dd.Date==mthyrstr) and (dd.year==fyr)):
@@ -586,7 +586,7 @@ def getsalesbacklogforweek(week_end_date,filters):
                 select s.cost_center as entity, sum(i.base_amount) as value_field, s.company, STR_TO_DATE(%(to_date)s,'%%Y-%%m-%%d') as endofweekdate, WEEK(%(to_date)s) as weekno
                 from `tabSales Order` s inner join `tabSales Order Item` i 
                  on s.name = i.parent left join `tabDelivery Note Item` b on 
-                s.name = b.against_sales_order and b.so_detail = i.name inner join `tabDelivery Note` a 
+                s.name = b.against_sales_order and b.so_detail = i.name left join `tabDelivery Note` a 
                 on b.parent = a.name 
                 where s.transaction_date <= %(to_date)s 
                 and s.status <> 'Cancelled' and s.cost_center IN %(cost_center)s
@@ -606,7 +606,7 @@ def getsalesbacklogforweek(week_end_date,filters):
                 select s.cost_center as entity, sum(i.base_amount) as value_field, s.company, STR_TO_DATE(%(to_date)s,'%%Y-%%m-%%d') as endofweekdate, WEEK(%(to_date)s) as weekno
                 from `tabSales Order` s inner join `tabSales Order Item` i 
                  on s.name = i.parent left join `tabDelivery Note Item` b on 
-                s.name = b.against_sales_order and b.so_detail = i.name inner join `tabDelivery Note` a 
+                s.name = b.against_sales_order and b.so_detail = i.name left join `tabDelivery Note` a 
                 on b.parent = a.name 
                 where s.transaction_date <= %(to_date)s 
                 and s.status <> 'Cancelled' 
@@ -622,29 +622,53 @@ def getsalesbacklogforweek(week_end_date,filters):
     return sales_allrecordm
 
 
-def getsalesbacklogforyr(month_end_date):
+def getsalesbacklogforyr(month_end_date,filters):
     retsql = ""
-    min_date_backlog = frappe.db.sql(
-            """
-            select M.*
-            from (
-            select CONCAT(DATE_FORMAT(STR_TO_DATE(%(to_date)s,'%%Y-%%m-%%d'), %(b)s),"-", RIGHT(fy.year,2)) as Date,
-            fy.year as year,
-            sum(i.base_amount) AS TotalAmt, s.cost_center
-            from `tabSales Order` s inner join  
-            `tabSales Order Item` i on s.name = i.parent
-            inner join `tabFiscal Year` fy on s.transaction_date >= fy.year_start_date and s.transaction_date <= fy.year_end_date
-            left join `tabDelivery Note Item` b on s.name = b.against_sales_order and b.so_detail = i.name inner join `tabDelivery Note` a on b.parent = a.name  
-            where s.transaction_date != a.posting_date and s.status <> 'Cancelled' 
-            and s.transaction_date <= %(to_date)s 
-            and ((a.posting_date > %(to_date)s) or (a.posting_date IS NULL))
-            group by CONCAT(DATE_FORMAT(STR_TO_DATE(%(to_date)s,'%%Y-%%m-%%d'), %(b)s),"-", RIGHT(fy.year,2)), fy.year,s.cost_center					
-                ) M 						
-            """, {
-                   'to_date': month_end_date,'b':'%b'				
-                 },		
-                   as_dict=0,
-               )  
+    if (filters.cost_center) :
+        cc = filters.cost_center
+        min_date_backlog = frappe.db.sql(
+                """
+                select M.*
+                from (
+                select CONCAT(DATE_FORMAT(STR_TO_DATE(%(to_date)s,'%%Y-%%m-%%d'), %(b)s),"-", RIGHT(fy.year,2)) as Date,
+                fy.year as year,
+                sum(i.base_amount) AS TotalAmt, s.cost_center
+                from `tabSales Order` s inner join  
+                `tabSales Order Item` i on s.name = i.parent
+                inner join `tabFiscal Year` fy on %(to_date)s >= fy.year_start_date and %(to_date)s <= fy.year_end_date
+                left join `tabDelivery Note Item` b on s.name = b.against_sales_order and b.so_detail = i.name left join `tabDelivery Note` a on b.parent = a.name  
+                where s.status <> 'Cancelled' and s.cost_center IN %(cost_center)s 
+                and s.transaction_date <= %(to_date)s 
+                and ((a.posting_date > %(to_date)s) or (a.posting_date IS NULL))
+                group by CONCAT(DATE_FORMAT(STR_TO_DATE(%(to_date)s,'%%Y-%%m-%%d'), %(b)s),"-", RIGHT(fy.year,2)), fy.year,s.cost_center					
+                    ) M 						
+                """, {
+                       'to_date': month_end_date,'b':'%b','cost_center': cc				
+                     },		
+                       as_dict=0,
+                   )
+    else :
+        min_date_backlog = frappe.db.sql(
+                """
+                select M.*
+                from (
+                select CONCAT(DATE_FORMAT(STR_TO_DATE(%(to_date)s,'%%Y-%%m-%%d'), %(b)s),"-", RIGHT(fy.year,2)) as Date,
+                fy.year as year,
+                sum(i.base_amount) AS TotalAmt, s.cost_center
+                from `tabSales Order` s inner join  
+                `tabSales Order Item` i on s.name = i.parent
+                inner join `tabFiscal Year` fy on %(to_date)s >= fy.year_start_date and %(to_date)s <= fy.year_end_date
+                left join `tabDelivery Note Item` b on s.name = b.against_sales_order and b.so_detail = i.name left join `tabDelivery Note` a on b.parent = a.name  
+                where s.status <> 'Cancelled' 
+                and s.transaction_date <= %(to_date)s 
+                and ((a.posting_date > %(to_date)s) or (a.posting_date IS NULL))
+                group by CONCAT(DATE_FORMAT(STR_TO_DATE(%(to_date)s,'%%Y-%%m-%%d'), %(b)s),"-", RIGHT(fy.year,2)), fy.year,s.cost_center					
+                    ) M 						
+                """, {
+                       'to_date': month_end_date,'b':'%b'				
+                     },		
+                       as_dict=0,
+                   )                 
 
     return min_date_backlog    
 

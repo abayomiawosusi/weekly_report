@@ -78,7 +78,8 @@ frappe.query_reports["Weekly Sales Report"] = {
 				callback: function (r) {
 					$(".report-wrapper").html("");
 					$(".justify-center").remove()
-                    //console.log(r.message[3])
+                    //console.log(r.message[3]) #selected date
+					console.log(r)
 					if (r.message[2] != "") {
 						//var fiscal_endDt = new Date(frappe.defaults.get_user_default("year_end_date"))
 						var fiscal_endDt = new Date(r.message[3])

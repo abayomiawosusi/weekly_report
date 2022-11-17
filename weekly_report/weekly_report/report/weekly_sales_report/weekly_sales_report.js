@@ -282,7 +282,7 @@ function row_celldynFunc(cnt_list, weekNo, colDt) {
 
 function row_celldynFuncsales(cnt_list, weekNo, colDt) {
 	celldynhtml = '<td style="">' + weekNo + '</td>';
-	for (var col = 0; col < colDt.length; col++) {
+	for (var col = 0; col < (colDt.length/2); col++) {
 		var iscol_exist = false
 		var gblweekprice = 0
 		var gblweekpricemargin = 0.0
@@ -355,7 +355,7 @@ function totalAmt_permthweekssales(cnt_list, colDt) {
 			if (fetchmnth == colDt[col].label) {
 				if (fetchweek.toLowerCase() != "") {
 					gblweekprice += val.sales
-				    gblweekprofit = val.grossprofit
+				    gblweekprofit += val.grossprofit
 					iscol_exist = true;
 				}
 			}
@@ -366,7 +366,7 @@ function totalAmt_permthweekssales(cnt_list, colDt) {
         } 		 
 		if (iscol_exist == true) {
 			celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">$' + (Math.round(gblweekprice)).toLocaleString() + '</td>';
-			celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">' + (gblweekpricemargin).toLocaleString() + '%</td>';
+			celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">' + (gblweekpricemargin).toLocaleString() + '</td>';
 		} else {
 			celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">$0</td>';
 			celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">0.0%</td>';

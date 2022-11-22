@@ -88,7 +88,7 @@ frappe.query_reports["Weekly Sales Report"] = {
 						var FYear = fiscal_endDt.getFullYear();
 						var monthName = months[fiscal_endDt.getMonth()];
 						var EndYearDate = monthName + " " + FDay + ", " + FYear;
-						dynamic_exportcontent(r.message, EndYearDate, filters.cost_center ? filters.cost_center : "")
+						dynamic_exportcontent(r.message, EndYearDate, filters.cost_center ? filters.cost_center : "",FYear)
 					} else {
 						alert("No record found.")
 					}
@@ -99,7 +99,7 @@ frappe.query_reports["Weekly Sales Report"] = {
 }
 
 // populates the spreadsheet and exports as .xls
-function dynamic_exportcontent(cnt_list, EDate, cost_center) {
+function dynamic_exportcontent(cnt_list, EDate, cost_center,FYear) {
 	var dynhtml = '<div id="dvData">';
 	var totlcnt = [];
 	var lstCstCntr = [];
@@ -167,7 +167,8 @@ function dynamic_exportcontent(cnt_list, EDate, cost_center) {
 		dynhtml += '</td></tr>';
 
 		dynhtml += '<tr><td>';
-		dynhtml += generatesalestable(cnt_list,$crntid,compnyName,EDate,gbl_ind);
+		// generate for each cost center and consolidated
+		dynhtml += generatesalestable(cnt_list,$crntid,compnyName,EDate,gbl_ind,FYear);
 		
 		dynhtml += '</td></tr>';
 
@@ -175,22 +176,18 @@ function dynamic_exportcontent(cnt_list, EDate, cost_center) {
 	})
 
 	dynhtml += '</div>';
-	console.log(dynhtml)
+	//console.log(dynhtml)
 	$(".report-wrapper").hide();
 	$(".report-wrapper").append(dynhtml);
 	tablesToExcel(totlcnt, lstCstCntr, 'SalesWeeklyReport.xls')
 }
 
 //cum for year is = sum(monthsales * monthgrossmargin)/sum(monthsales)
-function generatesalestable(cnt_list,$crntid,compnyName,EDate,gbl_ind) {
+function generatesalestable(cnt_list,$crntid,compnyName,EDate,gbl_ind,fyear) {
 	var dynhtml = '';
+	//gbl_ind is the position of cost center/consolidated in the array 
 	gbl_val = cnt_list[5][0][0][gbl_ind]
-	//$.each(cnt_list[5][0][0], function (gbl_ind, gbl_val) {
-		//var $crntid = "exprtid_" + gbl_ind;
-		//totlcnt[gbl_ind] = "#" + $crntid;
-		//lstCstCntr[gbl_ind] = gbl_val[0];
-		const Col_list = cnt_list[4];
-		//const divcol = Math.ceil(cnt_list[4].length / 4);
+	    const Col_list = cnt_list[4];
 		divcol = 8;
 
 		const collist = [];
@@ -200,25 +197,12 @@ function generatesalestable(cnt_list,$crntid,compnyName,EDate,gbl_ind) {
 		collist[3] = Col_list.slice(-2);
 
 		dynhtml += '<table id=' + $crntid + '_2' + '>';
-		//var compnyName = "";
-		//var trmcc = lstCstCntr[gbl_ind];
-		/*var spltcostcntr = (trmcc).split('-');
-        
-			if (spltcostcntr.length > 1) {
-				spltcostcntr.shift();
-				spltcostcntr.pop()
-
-			}
-        */
-		//var spltcostcntr = (trmcc).slice(5);
-		//var spltcostcntr1 = spltcostcntr.substr(0, (spltcostcntr.length)-5)
-        	
-
-		//compnyName = gbl_ind == 0 ? "Consolidated" : spltcostcntr1; //cnt_list[2];
-
 		dynhtml += '<caption><span style="font-weight: bold;">Company Name- ' + compnyName + '</br>Weekly Sales Report</br>For the Year ending ' + EDate + '</span><caption>';
+		var isyrtotalcol = false
+		var dyrtotalcolstart = collist.length - 1
 		for (var cnt = 0; cnt < collist.length; cnt++) {
 			//first half columns
+			// table broken into 4 parts - this loop goes through each part of table - e.g jul - oct sales and gross margin
 			dynhtml += '<tr></tr>';
 			dynhtml += '<tr>';
 			dynhtml += '<td width="100" style="font-weight: bold;text-decoration: underline;">Sales</td>';
@@ -227,13 +211,24 @@ function generatesalestable(cnt_list,$crntid,compnyName,EDate,gbl_ind) {
 				dynhtml += '<td width="100" style="text-align: center;border: 1px solid #89898d;font-weight: bold;"><span style="color:white;">"</span>' + (colmnth).toString() + '<span style="color:white;">"</span></td>';
 			}
 			dynhtml += '</tr>';
-			dynhtml += '<tr>' + (row_celldynFuncsales(gbl_val, "Week 1", collist[cnt])) + '</tr>';
-			dynhtml += '<tr>' + (row_celldynFuncsales(gbl_val, "Week 2", collist[cnt])) + '</tr>';
-			dynhtml += '<tr>' + (row_celldynFuncsales(gbl_val, "Week 3", collist[cnt])) + '</tr>';
-			dynhtml += '<tr>' + (row_celldynFuncsales(gbl_val, "Week 4", collist[cnt])) + '</tr>';
-			dynhtml += '<tr>' + (row_celldynFuncsales(gbl_val, "Week 5", collist[cnt])) + '</tr>';
-			dynhtml += '<tr>' + (totalAmt_permthweekssales(gbl_val, collist[cnt])) + '</tr>';
-			dynhtml += (year_totalamtsales(cnt_list[5][0][1], gbl_val[0], collist[cnt]))
+			if (cnt!=3)
+			{
+			 dynhtml += '<tr>' + (row_celldynFuncsales(gbl_val, "Week 1", collist[cnt],cnt)) + '</tr>';
+			 dynhtml += '<tr>' + (row_celldynFuncsales(gbl_val, "Week 2", collist[cnt],cnt)) + '</tr>';
+			 dynhtml += '<tr>' + (row_celldynFuncsales(gbl_val, "Week 3", collist[cnt],cnt)) + '</tr>';
+			 dynhtml += '<tr>' + (row_celldynFuncsales(gbl_val, "Week 4", collist[cnt],cnt)) + '</tr>';
+			 dynhtml += '<tr>' + (row_celldynFuncsales(gbl_val, "Week 5", collist[cnt],cnt)) + '</tr>';
+			} 
+			dynhtml += '<tr>' + (totalAmt_permthweekssales(gbl_val, collist[cnt],cnt,fyear)) + '</tr>';
+			
+			if (cnt == dyrtotalcolstart) {
+				isyrtotalcol = true
+			}
+			else {
+				isyrtotalcol = false
+			}
+			// argu -   arraylist,'Consolidated/Forest Products', col 3 in table breakup,specify if its last col, specify the position of columns to process
+			dynhtml += (year_totalamtsales(cnt_list[5][0][1], gbl_val[0], collist[cnt], cnt))
 			//dynhtml += '<td colspan="7"></td>';
 			dynhtml += '</tr>';
 		}
@@ -280,9 +275,13 @@ function row_celldynFunc(cnt_list, weekNo, colDt) {
 	return celldynhtml;
 }
 
-function row_celldynFuncsales(cnt_list, weekNo, colDt) {
-	celldynhtml = '<td style="">' + weekNo + '</td>';
-	for (var col = 0; col < (colDt.length/2); col++) {
+function row_celldynFuncsales(cnt_list, weekNo, colDt,cntslice) {
+	celldynhtml = '';
+	if (cntslice!=3)
+	{
+	 celldynhtml = '<td style="">' + weekNo + '</td>';
+	}
+	 for (var col = 0; col < colDt.length; col+=2) {
 		var iscol_exist = false
 		var gblweekprice = 0
 		var gblweekpricemargin = 0.0
@@ -300,14 +299,16 @@ function row_celldynFuncsales(cnt_list, weekNo, colDt) {
 				}
 			}
 		})
-
-		if (iscol_exist == true) {
+        if (cntslice!=3)
+		{
+		 if (iscol_exist == true) {
 			celldynhtml += '<td style="border: 1px solid #89898d;">$' + (Math.round(gblweekprice)).toLocaleString() + '</td>';
 			celldynhtml += '<td style="border: 1px solid #89898d;">' + (gblweekpricemargin).toLocaleString() + '%</td>';
-		} else {
+		 } else {
 			celldynhtml += '<td style="border: 1px solid #89898d;">$0</td>';
 			celldynhtml += '<td style="border: 1px solid #89898d;">0.0%</td>';
-		}
+		 }
+	    }
 	}
 	return celldynhtml;
 }
@@ -315,7 +316,6 @@ function row_celldynFuncsales(cnt_list, weekNo, colDt) {
 // total amount of week according to month
 function totalAmt_permthweeks(cnt_list, colDt) {
 	celldynhtml =  '<td style="font-weight: bold;">Mth End</td>';
-
 	for (var col = 0; col < colDt.length; col++) {
 		var iscol_exist = false
 		var gblweekprice = 0
@@ -340,10 +340,34 @@ function totalAmt_permthweeks(cnt_list, colDt) {
 	return celldynhtml;
 }
 
-function totalAmt_permthweekssales(cnt_list, colDt) {
-	celldynhtml =  '<td style="font-weight: bold;">Mth End</td>';
-
-	for (var col = 0; col < colDt.length; col++) {
+function totalAmt_permthweekssales(cnt_list, colDt,cntslice,fyear) {
+	
+    if (cntslice==3)
+	{
+	 celldynhtml = '<td style="font-weight: bold;text-align: left;">' + fyear + '</td>';
+	 for (var col = 0; col < colDt.length; col+=2) {
+		var iscol_exist = false
+		var gblweekprice = 0
+		var gblweekprofit = 0
+		var gblweekpricemargin = 0.0
+		$.each(cnt_list[1], function (ind, val) {
+			gblweekprice += val.sales
+			gblweekprofit += val.grossprofit
+			iscol_exist = true;
+		})
+		if (gblweekprice != 0) 
+		{
+         gblweekpricemargin = (gblweekprofit/gblweekprice)*100;
+        } 		 
+		celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">$' + (Math.round(gblweekprice)).toLocaleString() + '</td>';
+		celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">' + (gblweekpricemargin).toLocaleString("en-CA", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) + '%</td>';
+	 }
+	}
+	else
+	{
+	 celldynhtml =  '<td style="font-weight: bold;">Mth End</td>';
+	
+	 for (var col = 0; col < colDt.length; col+=2) {
 		var iscol_exist = false
 		var gblweekprice = 0
 		var gblweekprofit = 0
@@ -362,15 +386,16 @@ function totalAmt_permthweekssales(cnt_list, colDt) {
 		})
 		if (gblweekprice != 0) 
 		{
-         gblweekpricemargin = formatAsPercent(gblweekprofit/gblweekprice);
+         gblweekpricemargin = (gblweekprofit/gblweekprice)*100;
         } 		 
 		if (iscol_exist == true) {
 			celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">$' + (Math.round(gblweekprice)).toLocaleString() + '</td>';
-			celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">' + (gblweekpricemargin).toLocaleString() + '</td>';
+			celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">' + (gblweekpricemargin).toLocaleString("en-CA", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) + '%</td>';
 		} else {
 			celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">$0</td>';
 			celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;">0.0%</td>';
 		}
+	 }	
 	}
 	return celldynhtml;
 }
@@ -393,7 +418,6 @@ function year_totalamt(cnt_list, cstcntrNm, colDt) {
 			var colors = ["red", "blue", "green", "#E75480", "#c21010", "#5480E8"]
 			$.each(revrselist, function (rm_indx, rm_val) {
 				celldynhtml += '<tr>';
-
 				celldynhtml += '<td style="font-weight: bold;text-align: left;border-color:#89898d;color:' + colors[rm_indx] + '">' + rm_val.key + '</td>';
 				for (var col = 0; col < colDt.length; col++) {
 					var iscol_exist = false
@@ -424,9 +448,10 @@ function year_totalamt(cnt_list, cstcntrNm, colDt) {
 	return celldynhtml;
 }
 
-function year_totalamtsales(cnt_list, cstcntrNm, colDt) {
+function year_totalamtsales(cnt_list, cstcntrNm, colDt,colcnt) {
 	var celldynhtml = "";
-
+	if (colcnt != 3) 
+	{
 	$.each(cnt_list, function (rind, rval) {
 		if (rval[0].toLowerCase() == cstcntrNm.toLowerCase()) {
 			var revrselist = [];
@@ -441,9 +466,8 @@ function year_totalamtsales(cnt_list, cstcntrNm, colDt) {
 			var colors = ["red", "blue", "green", "#E75480", "#c21010", "#5480E8"]
 			$.each(revrselist, function (rm_indx, rm_val) {
 				celldynhtml += '<tr>';
-
 				celldynhtml += '<td style="font-weight: bold;text-align: left;border-color:#89898d;color:' + colors[rm_indx] + '">' + rm_val.key + '</td>';
-				for (var col = 0; col < colDt.length; col++) {
+				for (var col = 0; col < (colDt.length); col+=2) {
 					var iscol_exist = false
 					var gblweekprice = 0
 					var gblweekpricemargin = 0
@@ -462,7 +486,7 @@ function year_totalamtsales(cnt_list, cstcntrNm, colDt) {
 					})
 					if (iscol_exist == true) {
 						celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;border-color: #89898d;color:' + colors[rm_indx] + '">$' + (Math.round(gblweekprice)).toLocaleString() + '</td>';
-						celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;border-color: #89898d;color:' + colors[rm_indx] + '">' + (gblweekpricemargin).toLocaleString("en-CA", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) + '</td>';
+						celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;border-color: #89898d;color:' + colors[rm_indx] + '">' + (gblweekpricemargin).toLocaleString("en-CA", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) + '%</td>';
 					}
 					else {
 						celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;border-color: #89898d;color:' + colors[rm_indx] + '">$0</td>';
@@ -473,6 +497,59 @@ function year_totalamtsales(cnt_list, cstcntrNm, colDt) {
 			})
 		}
 	})
+    }
+	else
+	{
+		$.each(cnt_list, function (rind, rval) {
+			if (rval[0].toLowerCase() == cstcntrNm.toLowerCase()) {
+				var revrselist = [];
+				var mmm = Object.keys(rval[1])
+					.reverse()
+					.forEach(function (v, i) {
+						revrselist.push({
+							key: v,
+							value: rval[1][v]
+						});
+					});
+				var colors = ["red", "blue", "green", "#E75480", "#c21010", "#5480E8"]
+				$.each(revrselist, function (rm_indx, rm_val) {
+					celldynhtml += '<tr>';
+					celldynhtml += '<td style="font-weight: bold;text-align: left;border-color:#89898d;color:' + colors[rm_indx] + '">' + rm_val.key + '</td>';
+					for (var col = 0; col < (colDt.length); col+=2) {
+						var iscol_exist = false
+						var gblweekprice = 0
+						var gblweekprofit = 0
+						var gblweekpricemargin = 0
+						$.each(revrselist, function (m_indx, m_val) {
+							$.each(m_val.value, function (pm_indx, pm_val) {
+								var fetchmnth = pm_indx.split('-');
+								var crntyr = (rm_val.key).slice(-2);
+								if (crntyr == fetchmnth[1]) {
+									gblweekprice += pm_val.sales;
+									gblweekprofit += pm_val.grossprofit;
+									iscol_exist = true;
+								}
+							})
+						})
+						if (iscol_exist == true) {
+							if (gblweekprice != 0) 
+		                    {
+                              gblweekpricemargin = (gblweekprofit/gblweekprice)*100;
+                            } 	
+							celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;border-color: #89898d;color:' + colors[rm_indx] + '">$' + (Math.round(gblweekprice)).toLocaleString() + '</td>';
+							celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;border-color: #89898d;color:' + colors[rm_indx] + '">' + (gblweekpricemargin).toLocaleString("en-CA", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) + '%</td>';
+						}
+						else {
+							celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;border-color: #89898d;color:' + colors[rm_indx] + '">$0</td>';
+							celldynhtml += '<td style="border: 1px solid #89898d;font-weight: bold;border-color: #89898d;color:' + colors[rm_indx] + '">0.0%</td>';
+						}
+					}
+					celldynhtml += '</tr>';
+				})
+			}
+		})
+        			     
+	}
 	return celldynhtml;
 }
 

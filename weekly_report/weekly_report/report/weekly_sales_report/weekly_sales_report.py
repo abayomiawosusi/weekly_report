@@ -524,6 +524,7 @@ def get_weekly_report_record(report_name,filters):
     wksalesdatalst = cust_get_sales_rows_forallweeks(filters,wksalesdata,coycostcenters,start_date,fiscal_endDt)
     combinedsales_list=[]
     combinedsales_list.append((list(wksalesdatalst),yrsalesdata))
+    #print(combinedsales_list)
     #combinedsales_list.append(wksalesdata)
     #combinedsales_list.append(yrsalesdata)
     
@@ -916,7 +917,7 @@ def cust_get_weekperiod(filters, posting_date):
         if (week_of_month==6):
             week_of_month = 5
         weekperiod= "Week " + str(week_of_month) +"@"+mnthname +"-"+ str(posting_date.year)[-2:]
-        print(str(week_of_month) + " - " + weekperiod + " - " + str(posting_date))	
+        #print(str(week_of_month) + " - " + weekperiod + " - " + str(posting_date))	
     return weekperiod 
 
 def cust_get_mthperiod(filters, posting_date,fiscyr):
@@ -1169,223 +1170,6 @@ def getcostcenters(filters):
     return cstcnt
 
 ############## sales with gross margin section    			
-
-def get_weeklysalesprofit_report_record(report_name,filters):
-    from dateutil.relativedelta import MO, relativedelta
-    # Skipping total row for tree-view reports
-    skip_total_row = 0
-    #return self.columns, self.data, None, None, skip_total_row
-    
-
-    filterDt= json.loads(filters)	
-    filters = frappe._dict(filterDt or {})	
-    
-    if filters.to_date:
-        end_date= filters.to_date
-    else:
-        end_date= date.today()
-    
-    fiscalyeardt= fetchselected_fiscalyear(end_date)
-    for fy in fiscalyeardt:
-        start_date=fy.get('year_start_date').strftime('%Y-%m-%d')
-        fiscal_endDt=fy.get('year_end_date').strftime('%Y-%m-%d')
-
-    filters.update({"fiscal_endDt":fiscal_endDt})
-    filters.update({"from_date":start_date})
-    
-    #######
-    coycostcenters = getcostcenters(filters)
-    
-    fiscalyeardtprev, prevyrsstartdate = fetch5yrsback_fiscalyear(5,filters)
-    #for fy2 in fiscalyeardtprev:
-    #    print(str(fy2.year) + ' ' + str(fy2.year_start_date) + ' ' + str(fy2.year_end_date) )
-    #######
-
-    #print("c13")
-    if filters.cost_center:	
-        sales_allrecord = frappe.db.sql(
-            """
-            select X.* from (select 'Consolidated' as entity, i.base_amount as value_field, s.transaction_date, 
-            s.company from `tabSales Order` s,
-            `tabSales Order Item` i where s.name = i.parent and s.status <> 'Cancelled'and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-            and  s.cost_center = %(cost_center)s
-            and s.transaction_date between  %(from_date)s and %(to_date)s 				
-            union
-            select s.cost_center as entity, i.base_amount as value_field, s.transaction_date,s.company
-            from `tabSales Order` s,`tabSales Order Item` i 
-            where s.name = i.parent and 
-            s.status <> 'Cancelled' 
-            and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-            and  s.cost_center = %(cost_center)s
-            and s.transaction_date between  %(from_date)s and %(to_date)s 
-            ) X
-            """, {
-                    'cost_center': filters.cost_center,'from_date': filters.from_date,'to_date': end_date				
-                },		
-                as_dict=1,
-            )	
-        min_date_backlog = frappe.db.sql(
-                """
-                select M.*
-                    from (select CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
-                    fy.year as year,
-                    sum(i.base_amount) AS TotalAmt, 'Consolidated' as cost_center
-                    from `tabSales Order` s,`tabSales Order Item` i, `tabFiscal Year` fy 
-                    where s.name = i.parent and 
-                    s.status <> 'Cancelled'
-                    and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-                    and s.transaction_date < %(before_date)s and s.transaction_date >= %(prevstart_date)s
-                    and s.transaction_date >= fy.year_start_date and s.transaction_date <= fy.year_end_date 		
-                    and  s.cost_center = %(cost_center)s			
-                    group by month(s.transaction_date), fy.year					
-                    UNION
-                    select CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
-                    fy.year as year,
-                    sum(i.base_amount) AS TotalAmt, s.cost_center
-                    from `tabSales Order` s,`tabSales Order Item` i , `tabFiscal Year` fy
-                    where s.name = i.parent and 
-                    s.status <> 'Cancelled'
-                    and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-                    and s.transaction_date < %(before_date)s and s.transaction_date >= %(prevstart_date)s
-                    and s.transaction_date >= fy.year_start_date and s.transaction_date <= fy.year_end_date 
-                    and  s.cost_center = %(cost_center)s
-                    group by month(s.transaction_date), fy.year,s.cost_center					
-                                
-                ) M	
-            """, {
-                    'before_date': start_date	,'b':'%b','cost_center': filters.cost_center,'Y':'%y','prevstart_date' : prevyrsstartdate			
-                },		
-                as_dict=1,
-            )			
-    else:
-        sales_allrecord = frappe.db.sql(
-            """
-            select X.*
-            from (select 'Consolidated' as entity, i.base_amount as value_field, s.transaction_date, s.company from `tabSales Order` s,
-            `tabSales Order Item` i where s.name = i.parent and s.status <> 'Cancelled'and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-            and s.transaction_date between  %(from_date)s and %(to_date)s 			
-            UNION
-            select s.cost_center as entity, i.base_amount as value_field, s.transaction_date, s.company
-            from `tabSales Order` s,`tabSales Order Item` i 
-            where s.name = i.parent and 
-            s.status <> 'Cancelled'
-            and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-            and s.transaction_date between  %(from_date)s and %(to_date)s 
-                ) X
-            """, {
-                    'from_date': start_date,'to_date': filters.to_date				
-                },		
-                as_dict=1,
-            )	
-        min_date_backlog = frappe.db.sql(
-                    """
-                    select M.*
-                    from (select CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
-                    fy.year as year,
-                    sum(i.base_amount) AS TotalAmt, 'Consolidated' as cost_center
-                    from `tabSales Order` s,`tabSales Order Item` i, `tabFiscal Year` fy 
-                    where s.name = i.parent and 
-                    s.status <> 'Cancelled'
-                    and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-                    and s.transaction_date < %(before_date)s and s.transaction_date >= %(prevstart_date)s
-                    and s.transaction_date >= fy.year_start_date and s.transaction_date <= fy.year_end_date
-                    group by month(s.transaction_date), fy.year					
-                    UNION
-                    select CONCAT(DATE_FORMAT(s.transaction_date, %(b)s),"-", RIGHT(fy.year,2)) as Date,
-                    fy.year as year,
-                    sum(i.base_amount) AS TotalAmt, s.cost_center
-                    from `tabSales Order` s,`tabSales Order Item` i, `tabFiscal Year` fy 
-                    where s.name = i.parent and 
-                    s.status <> 'Cancelled'
-                    and s.delivery_status='Not Delivered' and s.billing_status='Not Billed'
-                    and s.transaction_date < %(before_date)s and s.transaction_date >= %(prevstart_date)s
-                    and s.transaction_date >= fy.year_start_date and s.transaction_date <= fy.year_end_date
-                    group by month(s.transaction_date), fy.year,s.cost_center					
-                    ) M 						
-                """, {
-                        'before_date': start_date	,'b':'%b','Y':'%y','prevstart_date' : prevyrsstartdate				
-                    },		
-                    as_dict=1,
-                )	
-    year_total_list = frappe._dict()	
-    for dd in min_date_backlog:		
-        #print(dd)				
-        year_total_list.setdefault(dd.cost_center, frappe._dict()).setdefault(dd.year,frappe._dict()).setdefault(dd.Date,dd.TotalAmt)						
-        year_total_list[dd.cost_center][dd.year][dd.Date] += flt(dd.TotalAmt)	
-    #print(year_total_list)    
-
-    
-    # check through all cost centers and prev yrs and see missing months and year and initialize to zero
-    year_total_list2 = frappe._dict()
-    for fy3 in fiscalyeardtprev: 
-        fyr = fy3.year
-        fsd = fy3.year_start_date
-        fed = fy3.year_end_date
-        currdt = fy3.year_start_date
-        bkltotamt = 0.0
-        #for x in range(1, 12):
-        i = 1
-        while ((i < 13) and (currdt < fed)):
-            i += 1
-            #print(currdt)
-            mthyrstr = currdt.strftime("%b") + "-" + fyr[-2:]
-            #print(mthyrstr)
-            #take care of consolidated cost center
-            #loop through all cost centers
-            consolidatedcc = 'Consolidated'
-            ccTotalAmt0 = 0
-            for dd in min_date_backlog:
-                if ((dd.cost_center==consolidatedcc) and (dd.Date==mthyrstr) and (dd.year==fyr)):
-                    ccTotalAmt0 = dd.TotalAmt
-            year_total_list2.setdefault(consolidatedcc, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(mthyrstr,ccTotalAmt0)
-            year_total_list2[consolidatedcc][fyr][mthyrstr] += flt(ccTotalAmt0)
-            #
-            if filters.cost_center:
-                ccTotalAmt = 0
-                cc = filters.cost_center
-                for dd in min_date_backlog:
-                    if ((dd.cost_center==cc) and (dd.Date==mthyrstr) and (dd.year==fyr)):
-                        ccTotalAmt = dd.TotalAmt
-                year_total_list2.setdefault(cc, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(mthyrstr,ccTotalAmt)
-                year_total_list2[cc][fyr][mthyrstr] += flt(ccTotalAmt)            
-            else:
-                for cc in coycostcenters:
-                    ccTotalAmt = 0
-                    for dd in min_date_backlog:
-                        if ((dd.cost_center==cc) and (dd.Date==mthyrstr) and (dd.year==fyr)):
-                            ccTotalAmt = dd.TotalAmt
-                    year_total_list2.setdefault(cc, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(mthyrstr,ccTotalAmt)
-                    year_total_list2[cc][fyr][mthyrstr] += flt(ccTotalAmt)
-
-            currdt2 = currdt + relativedelta(months=+1)
-            currdt = currdt2
-
-
-    #print(year_total_list2)        
-    
-    #year_lis = list(year_total_list.items())  #convert dict to list
-    year_lis = list(year_total_list2.items())
-    
-    WSobj = WeeklySales()
-    WSobj.__init__()	
-    compnyName=""	
-    if sales_allrecord:
-        ftch_cmpny = {entry.get('company') for entry in sales_allrecord}		
-        compnyName=ftch_cmpny
-        
-    Cust_periodic_daterange=cust_get_period_date_ranges(filters)
-    Cust_colum_name=cust_get_columns(filters,Cust_periodic_daterange)
-    #print(Cust_colum_name)	
-    #Cust_rows_values=cust_get_rows(filters,sales_allrecord,Cust_periodic_daterange)
-    Cust_rows_values=cust_get_rows_forallweeks(filters,sales_allrecord,Cust_periodic_daterange,coycostcenters,start_date,fiscal_endDt)
-    #print(Cust_rows_values)
-    combined_list=[]
-    combined_list.append((list(Cust_rows_values), year_lis))
-    #print(combined_list)
-    #print(year_lis)	
-    #print(Cust_rows_values)
-
-    return Cust_colum_name,combined_list,compnyName
 
 
 class GrossProfitGeneratorbydaterange(object):
@@ -1645,11 +1429,11 @@ class GrossProfitGeneratorbydaterange(object):
     
     def load_invoice_items(self,start_date,end_date):
         conditions = ""
-        conditions2 = ""
+        #conditions2 = ""
         if self.filters.company:
-            conditions2 += " and company = %(company)s"
+            conditions += " and company = %(company)s"
         if self.filters.get("cost_center"):
-            conditions2 += " and `tabSales Invoice Item`.cost_center IN %(cost_center)s"    
+            conditions += " and `tabSales Invoice Item`.cost_center IN %(cost_center)s"    
         conditions += " and (posting_date >= '" + start_date + "' and posting_date <= '" + end_date + "')"
         skip_total_row = 0
         
@@ -1871,6 +1655,7 @@ def get_weeklysales_report_record(filters,start_date,fiscal_endDt,coycostcenters
         i=0
         firstdayislastwkday = 0
         cumsalesmtd1 = 0.0
+        cumsalesmtd2 = 0.0
         while currdat <= filters.to_date:
             flagfirstdaypass = 0
             if (firstdayislastwkday == 1):
@@ -2173,7 +1958,7 @@ def get_weeklysales_report_record(filters,start_date,fiscal_endDt,coycostcenters
     
     #year_lis = list(year_total_list.items())  #convert dict to list
     year_lis = list(mth_total_list2.items())
-    wk_lis = list(wk_total_list.items())
+    wk_lis = wk_total_list #list(wk_total_list.items())
     return wk_lis,year_lis	
   
 

@@ -315,7 +315,7 @@ def get_weekly_report_record(report_name,filters):
     filters.update({"fiscalyr":fiscalyr})
     
     #######
-    coycostcenters = getcostcenters(filters)
+    coycostcenters,coycostcenternos = getcostcenters(filters)
     
     fiscalyeardtprev, prevyrsstartdate = fetch5yrsback_fiscalyear(5,filters)
     
@@ -327,12 +327,15 @@ def get_weekly_report_record(report_name,filters):
         sales_allrecord = [] #frappe._dict() 
         i=0
         firstdayislastwkday = 0
+        #flagfirstdaypass = 0
+        #currdat,itsdlastday,firstdayislastwkday = getwkenddate(currdat,flagfirstdaypass)
         while currdat <= filters.to_date:
             flagfirstdaypass = 0
             if (firstdayislastwkday == 1):
                 flagfirstdaypass = 1
             currdat,itsdlastday,firstdayislastwkday = getwkenddate(currdat,flagfirstdaypass)
             sales_recssubset = getsalesbacklogforweek(currdat,filters)
+            
             if (itsdlastday == 1):
                 currdat = add_to_date(currdat,days=1)
 
@@ -383,13 +386,19 @@ def get_weekly_report_record(report_name,filters):
         sales_allrecord = [] #frappe._dict() 
         i=0
         firstdayislastwkday = 0
+        #flagfirstdaypass = 0
+        #currdat,itsdlastday,firstdayislastwkday = getwkenddate(currdat,flagfirstdaypass)
+
         while currdat <= filters.to_date:
             flagfirstdaypass = 0
             if (firstdayislastwkday == 1):
                 flagfirstdaypass = 1
             currdat,itsdlastday,firstdayislastwkday = getwkenddate(currdat,flagfirstdaypass)
-            #print(str(currdat) + " - " + str(itsdlastday)+ " - " + str(firstdayislastwkday))
+            print(str(currdat) + " - " + str(itsdlastday)+ " - " + str(firstdayislastwkday))
             sales_recssubset = getsalesbacklogforweek(currdat,filters)
+
+            
+
             if (itsdlastday == 1):
                 currdat = add_to_date(currdat,days=1)    
             
@@ -520,7 +529,7 @@ def get_weekly_report_record(report_name,filters):
     ############
     # call the sales section
     cust_salescolum_name=cust_getsales_columns(filters,Cust_periodic_daterange)
-    wksalesdata,yrsalesdata = get_weeklysales_report_record(filters,start_date,fiscal_endDt,coycostcenters,fiscalyeardtprev)
+    wksalesdata,yrsalesdata = get_weeklysales_report_record(filters,start_date,fiscal_endDt,coycostcenters,fiscalyeardtprev,coycostcenternos)
     wksalesdatalst = cust_get_sales_rows_forallweeks(filters,wksalesdata,coycostcenters,start_date,fiscal_endDt)
     combinedsales_list=[]
     combinedsales_list.append((list(wksalesdatalst),yrsalesdata))
@@ -751,7 +760,7 @@ def getwkenddate(currdt,flag1stdatepassdone):
         retdate = mth_enddate
         islastday = 1
     # return date, and if last day = 1
-    #print(retdate.strftime('%Y-%m-%d') + " - " + str(islastday))
+    print(retdate.strftime('%Y-%m-%d') + " - " + str(islastday))
     return retdate.strftime('%Y-%m-%d'), islastday , firstdayislastwkday 
 
 def getwkstartenddate(currdt,flag1stdatepassdone):
@@ -1141,9 +1150,11 @@ def fetch5yrsback_fiscalyear(noofyrsback,filters):
     #print(prevyrsstartdate)			
     return fetch_fiscalyearslctn,prevyrsstartdate
 
+
 def getcostcenters(filters):
     cstcnt = [] # get function to fetch cost centers
-    cstcnt0 = frappe.db.get_list("Cost Center",pluck='name',filters={'company': filters.company,'is_group':0})
+    cstcntno = []
+    cstcnt0 = frappe.db.get_list("Cost Center",filters={'company': filters.company,'is_group':0},fields=['name', 'cost_center_number'])
     # change the order of cost center this is customized for this client
     #specify order here 02, 03, 01, 06
     #cstorder = []
@@ -1151,8 +1162,9 @@ def getcostcenters(filters):
     i = 0
     while(i<len(cstorder)):
         for cstr in cstcnt0:
-            if (cstr.startswith(cstorder[i])):
-                cstcnt.append(cstr)
+            if ((cstr.name).startswith(cstorder[i])):
+                cstcnt.append(cstr.name)
+                cstcntno.append(cstr.cost_center_number)
         i+=1
         
     # if created cost centers increase
@@ -1160,14 +1172,46 @@ def getcostcenters(filters):
         for cstr2 in cstcnt0:
             cstfound = False
             for m in cstcnt:
-                if (m==cstr2):
+                if (m==cstr2.name):
                     cstfound = True
             if (cstfound == False):
-                 cstcnt.append(cstr2)         
-
+                 cstcnt.append(cstr2.name)         
+                 cstcntno.append(cstr2.cost_center_number) 
     if (len(cstcnt)==0):
-       cstcnt = cstcnt0 
-    return cstcnt
+        for cstr in cstcnt0:
+            cstcnt.append(cstr.name)
+            cstcntno.append(cstr.cost_center_number)
+        
+              
+    return cstcnt,cstcntno
+
+#def getcostcenters(filters):
+#    cstcnt = [] # get function to fetch cost centers
+#    cstcnt0 = frappe.db.get_list("Cost Center",pluck='name',filters={'company': filters.company,'is_group':0})
+#    # change the order of cost center this is customized for this client
+#    #specify order here 02, 03, 01, 06
+#    #cstorder = []
+#    cstorder = ['02', '03', '06', '01']
+#    i = 0
+#    while(i<len(cstorder)):
+#        for cstr in cstcnt0:
+#            if (cstr.startswith(cstorder[i])):
+#                cstcnt.append(cstr)
+#        i+=1
+        
+#    # if created cost centers increase
+#    if ((len(cstorder)<len(cstcnt0)) and (len(cstcnt)>0) ):
+#        for cstr2 in cstcnt0:
+#            cstfound = False
+#            for m in cstcnt:
+#                if (m==cstr2):
+#                    cstfound = True
+#            if (cstfound == False):
+#                 cstcnt.append(cstr2)         
+
+#    if (len(cstcnt)==0):
+#       cstcnt = cstcnt0 
+#    return cstcnt
 
 ############## sales with gross margin section    			
 
@@ -1640,7 +1684,7 @@ def cust_get_columns_for_weeklysales(filters,Cust_periodic_daterange):
     return cust_columns
 
 
-def get_weeklysales_report_record(filters,start_date,fiscal_endDt,coycostcenters,fiscalyeardtprev):
+def get_weeklysales_report_record(filters,start_date,fiscal_endDt,coycostcenters,fiscalyeardtprev,coycostcenternos):
     from dateutil.relativedelta import MO, relativedelta
     # Skipping total row for tree-view reports
     
@@ -1807,57 +1851,86 @@ def get_weeklysales_report_record(filters,start_date,fiscal_endDt,coycostcenters
 
         min_date_backloglst = []
         #
+        styear = 0
+        endyear = 0
+        j = 0
         for fy3 in fiscalyeardtprev: 
-            fyr = fy3.year
-            fsd = fy3.year_start_date
-            fed = fy3.year_end_date
-            currdt = fy3.year_start_date
+            if j == 0 :
+                styear = fy3.year
+            j+=1
+            if j == 4 :    
+                endyear = fy3.year 
+            #print('j-' + str(j))   
+
+        ddictkey = get_keycode(coycostcenternos,'sl',styear,endyear)
+        prevyrsales_sessions = get_prevweeklysalesdata(ddictkey)   #frappe.cache().hget("costcenter-yrfrom-yrto-sessions","check1")
+        if prevyrsales_sessions=='':     #None:
+            for fy3 in fiscalyeardtprev: 
+                fyr = fy3.year
+                fsd = fy3.year_start_date
+                fed = fy3.year_end_date
+                currdt = fy3.year_start_date
         
-            i = 1
-            while ((i < 13) and (currdt < fed)):
-                mth_end_day = calendar.monthrange(currdt.year,currdt.month)[1]
-                mth_end_date = datetime.date(currdt.year, currdt.month, mth_end_day)
-                mth_start_date = datetime.date(currdt.year, currdt.month, 1)
-                mth_start_datestr = mth_start_date.strftime('%Y-%m-%d')
-                mth_end_datestr = mth_end_date.strftime('%Y-%m-%d')
-                gross_profit_data_formth = GrossProfitGeneratorbydaterange(mth_start_datestr,mth_end_datestr,filters)
-                i += 1
-                currdt2 = currdt + relativedelta(months=+1)
-                currdt = currdt2
+                i = 1
+                while ((i < 13) and (currdt < fed)):
+                    mth_end_day = calendar.monthrange(currdt.year,currdt.month)[1]
+                    mth_end_date = datetime.date(currdt.year, currdt.month, mth_end_day)
+                    mth_start_date = datetime.date(currdt.year, currdt.month, 1)
+                    mth_start_datestr = mth_start_date.strftime('%Y-%m-%d')
+                    mth_end_datestr = mth_end_date.strftime('%Y-%m-%d')
+                    gross_profit_data_formth = GrossProfitGeneratorbydaterange(mth_start_datestr,mth_end_datestr,filters)
+                    i += 1
+                    currdt2 = currdt + relativedelta(months=+1)
+                    currdt = currdt2
                 
-                cumsaleswk2 = 0.0
-                wkgrossprf2 = 0.0
-                salesweekstr = "sales"
-                grossprofitstr = "grossprofit"
-                grossprofitmarginstr = "grossprofitmargin"
-                concstr = "Consolidated"	
-                for dd in gross_profit_data_formth.si_list:
-                    if (dd["indent"]==0.0):
-                        cumsaleswk2 += dd["base_net_amount"]
-                        cumsalesmtd2 += dd["base_net_amount"] 
-                        wkgrossprf2 += dd["gross_profit"]
-                        cust_period = cust_get_mthperiod(filters,dd["posting_date"],fyr)
-                        mth_total_list.setdefault(dd.cost_center, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(salesweekstr,0.0)
-                        mth_total_list[dd.cost_center][fyr][cust_period][salesweekstr] += flt(dd["base_net_amount"])
-                        mth_total_list.setdefault(dd.cost_center, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(grossprofitstr,0.0)
-                        mth_total_list[dd.cost_center][fyr][cust_period][grossprofitstr] += flt(dd["gross_profit"])
-                        mth_total_list.setdefault(dd.cost_center, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(grossprofitmarginstr,0.0)
+                    cumsaleswk2 = 0.0
+                    wkgrossprf2 = 0.0
+                    salesweekstr = "sales"
+                    grossprofitstr = "grossprofit"
+                    grossprofitmarginstr = "grossprofitmargin"
+                    concstr = "Consolidated"	
+                    for dd in gross_profit_data_formth.si_list:
+                        if (dd["indent"]==0.0):
+                            cumsaleswk2 += dd["base_net_amount"]
+                            cumsalesmtd2 += dd["base_net_amount"] 
+                            wkgrossprf2 += dd["gross_profit"]
+                            cust_period = cust_get_mthperiod(filters,dd["posting_date"],fyr)
+                            mth_total_list.setdefault(dd.cost_center, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(salesweekstr,0.0)
+                            mth_total_list[dd.cost_center][fyr][cust_period][salesweekstr] += flt(dd["base_net_amount"])
+                            mth_total_list.setdefault(dd.cost_center, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(grossprofitstr,0.0)
+                            mth_total_list[dd.cost_center][fyr][cust_period][grossprofitstr] += flt(dd["gross_profit"])
+                            mth_total_list.setdefault(dd.cost_center, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(grossprofitmarginstr,0.0)
                     
-                        mth_total_list.setdefault(concstr, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(salesweekstr,0.0)
-                        mth_total_list[concstr][fyr][cust_period][salesweekstr] += flt(dd["base_net_amount"])
-                        mth_total_list.setdefault(concstr, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(grossprofitstr,0.0)
-                        mth_total_list[concstr][fyr][cust_period][grossprofitstr] += flt(dd["gross_profit"])
-                        mth_total_list.setdefault(concstr, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(grossprofitmarginstr,0.0)
-                        try:
-                            mth_total_list[dd.cost_center][fyr][cust_period][grossprofitmarginstr] = mth_total_list[dd.cost_center][fyr][cust_period][grossprofitstr]/mth_total_list[dd.cost_center][fyr][cust_period][salesweekstr] * 100
-                        except ZeroDivisionError:
-                            mth_total_list[dd.cost_center][fyr][cust_period][grossprofitmarginstr] = 0
-                        try:
-                            mth_total_list[concstr][fyr][cust_period][grossprofitmarginstr] = mth_total_list[concstr][fyr][cust_period][grossprofitstr]/mth_total_list[concstr][fyr][cust_period][salesweekstr] * 100
-                        except ZeroDivisionError:
-                            mth_total_list[concstr][fyr][cust_period][grossprofitmarginstr] = 0
+                            mth_total_list.setdefault(concstr, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(salesweekstr,0.0)
+                            mth_total_list[concstr][fyr][cust_period][salesweekstr] += flt(dd["base_net_amount"])
+                            mth_total_list.setdefault(concstr, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(grossprofitstr,0.0)
+                            mth_total_list[concstr][fyr][cust_period][grossprofitstr] += flt(dd["gross_profit"])
+                            mth_total_list.setdefault(concstr, frappe._dict()).setdefault(fyr,frappe._dict()).setdefault(cust_period,frappe._dict()).setdefault(grossprofitmarginstr,0.0)
+                            try:
+                                mth_total_list[dd.cost_center][fyr][cust_period][grossprofitmarginstr] = mth_total_list[dd.cost_center][fyr][cust_period][grossprofitstr]/mth_total_list[dd.cost_center][fyr][cust_period][salesweekstr] * 100
+                            except ZeroDivisionError:
+                                mth_total_list[dd.cost_center][fyr][cust_period][grossprofitmarginstr] = 0
+                            try:
+                                mth_total_list[concstr][fyr][cust_period][grossprofitmarginstr] = mth_total_list[concstr][fyr][cust_period][grossprofitstr]/mth_total_list[concstr][fyr][cust_period][salesweekstr] * 100
+                            except ZeroDivisionError:
+                                mth_total_list[concstr][fyr][cust_period][grossprofitmarginstr] = 0
         
-        #print(mth_total_list)       
+            set_prevweeklysalesdata(ddictkey,json.dumps(mth_total_list)) 
+            #frappe.cache().hset("costcenter-yrfrom-yrto-sessions","check1",mth_total_list)
+            #frappe.cache().bgsave()
+        else :
+            mth_total_list = json.loads(prevyrsales_sessions)   #json.loads(get_prevweeklysalesdata(ddictkey))
+            #mth_total_list = frappe.cache().hget("costcenter-yrfrom-yrto-sessions","check1") 
+            print("cache found")
+            
+            #print(mth_total_list)
+            ##### to convert dict to byte
+            #frappe.cache().set("costcenter-yrfrom-yrto-sessions",mth_total_list)
+            #res_bytes = json.dumps(mth_total_list).encode('utf-8')
+            ##### to convert back to dict
+            #res_bytes = frappe.cache().get("costcenter-yrfrom-yrto-sessions")
+            #mth_total_list = json.loads(res_bytes.decode('utf-8'))   
+        print(mth_total_list)       
        
     year_total_list = frappe._dict()	
     
@@ -1956,10 +2029,55 @@ def get_weeklysales_report_record(filters,start_date,fiscal_endDt,coycostcenters
 
     #print(mth_total_list)        
     
+    
+
     #year_lis = list(year_total_list.items())  #convert dict to list
     year_lis = list(mth_total_list2.items())
     wk_lis = wk_total_list #list(wk_total_list.items())
     return wk_lis,year_lis	
   
+def get_prevweeklysalesdata(dictkey):
+    # call function to retrieve data from table
+    retval = ''
+    fetch_prevweeklysalesdata = frappe.db.sql(
+        """
+        select id, dictkey , dictval from `tabWeeklyreportdata`
+        where dictkey = %(dictkey)s 
+        """,{
+            'dictkey': dictkey
+        },		
+        as_dict=0,
+    )
+    if fetch_prevweeklysalesdata:
+        print(fetch_prevweeklysalesdata)
+        retval = fetch_prevweeklysalesdata[0][2]
+    print(retval)
+    return retval     
+    # return retuned value - can be null /none
+    
+def set_prevweeklysalesdata(dictkey,dictval):
+    # call function to save data to table
+    set_prevweeklysalesdata = frappe.db.sql(
+        """
+        insert into `tabWeeklyreportdata`(dictkey , dictval) values
+         (%(dictkey)s , %(dictval)s)
+        """,{
+            'dictkey': dictkey,'dictval': dictval,
+        },		
+        debug=1,
+        auto_commit=1
+    )
+    if set_prevweeklysalesdata:
+        print("saved")
 
+def get_keycode(coycostcenternos,secsuffix,styear,endyear):
+    retval = ''
+    yrcode = str(styear)+'-'+str(endyear)
+    coycostcenternosstr = ''
+    for ccno in coycostcenternos:
+        coycostcenternosstr += ccno  
+    retval = 'wk-' + secsuffix + '-' + coycostcenternosstr + '-' + yrcode
+    print(retval)
+    return retval        
+            
 
